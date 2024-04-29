@@ -1,0 +1,14 @@
+{
+  "name": "sqf-parser",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "wyq",
+  "license": "MIT",
+  "scripts": {
+    "build:main": "rollup -c parser/rollup.config.mjs"
+  },
+  "devDependencies": {
+    "@rollup/plugin-buble": "^1.0.3",
+    "rollup": "^4.14.1"
+  }
+}

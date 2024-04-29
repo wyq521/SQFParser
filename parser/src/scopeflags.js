@@ -1,0 +1,12 @@
+// Each scope gets a bitset that may contain these flags
+export const
+    SCOPE_TOP = 1,
+    SCOPE_FUNCTION = 2,
+    SCOPE_ASYNC = 4,
+    SCOPE_GENERATOR = 8,
+    SCOPE_ARROW = 16,
+    SCOPE_SIMPLE_CATCH = 32,
+    SCOPE_SUPER = 64,
+    SCOPE_DIRECT_SUPER = 128,
+    SCOPE_CLASS_STATIC_BLOCK = 256,
+    SCOPE_VAR = SCOPE_TOP | SCOPE_FUNCTION | SCOPE_CLASS_STATIC_BLOCK

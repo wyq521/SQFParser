@@ -1,0 +1,36 @@
+{
+  "name": "parser",
+  "description": "sqf parser",
+  "homepage": "",
+  "main": "dist/parser.js",
+  "module": "dist/parser.mjs",
+  "exports": {
+    ".": [
+      {
+        "import": "./dist/parser.mjs",
+        "require": "./dist/parser.js",
+        "default": "./dist/parser.js"
+      },
+      "./dist/parser.js"
+    ],
+    "./package.json": "./package.json"
+  },
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=0.4.0"
+  },
+  "maintainers": [
+    {
+      "name": "Wang Yanqi",
+      "email": "376977516@qq.com",
+      "web": "null"
+    }
+  ],
+  "license": "MIT",
+  "scripts": {
+    "prepare": "cd ..; npm run build:main"
+  },
+  "bin": {
+    "parser": "bin/parser"
+  }
+}

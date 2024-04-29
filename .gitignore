@@ -1,0 +1,6 @@
+.DS_Store
+.tern-port
+/node_modules
+/local
+/parser/dist
+/yarn.lock
