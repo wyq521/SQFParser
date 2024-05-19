@@ -13,3 +13,8 @@ export function isIdentifierChar(ch) {
   ch >= 97 && ch <= 122 || // a...z
   ch >= 48 && ch <= 57; // 0...9
 }
+
+// 判断给定的变量名是否是全局变量
+export function isGlobalVariable(value) {
+  return value.startsWith("_");
+}
