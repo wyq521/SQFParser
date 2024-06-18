@@ -68,7 +68,7 @@ pp.parseMaybeAssign = function (
   }
   // parse 条件表达式,sqf中没有这个语法
   // let left = this.parseMaybeConditional(forInit, refDestructuringErrors)
-  let left;
+  let left = ;
   if (afterLeftParse)
     left = afterLeftParse.call(this, left, startPos, startLoc);
   if (this.type.isAssign) {
@@ -107,6 +107,13 @@ pp.parseMaybeAssign = function (
   return left;
 };
 
+pp.parseExprOps = function(forInit, refDestructuringErrors) {
+  let startPos = this.start, startLoc = this.startLoc
+  let expr = this.parseMaybeUnary(refDestructuringErrors, false, false, forInit)
+  if (this.checkExpressionErrors(refDestructuringErrors)) return expr
+  return expr.start === startPos && expr.type === "ArrowFunctionExpression" ? expr : this.parseExprOp(expr, startPos, startLoc, -1, forInit)
+}
+
 pp.parseMaybeUnary = function (
   refDestructuringErrors,
   sawUnary,
@@ -115,7 +122,7 @@ pp.parseMaybeUnary = function (
 ) {
   if (this.type.prefix) {
     let node = this.startNode(),
-      update = this.type === tt.incDec;
+    update = this.type === tt.incDec;
     node.operator = this.value;
     node.prefix = true;
     this.next();
@@ -166,6 +173,86 @@ pp.parseExprSubscripts = function(refDestructuringErrors, forInit) {
     if (refDestructuringErrors.trailingComma >= result.start) refDestructuringErrors.trailingComma = -1
   }
   return result
+}
+
+pp.parseSubscripts = function() {
+  let maybeAsyncArrow = this.options.ecmaVersion >= 8 && base.type === "Identifier" && base.name === "async" &&
+      this.lastTokEnd === base.end && !this.canInsertSemicolon() && base.end - base.start === 5 &&
+      this.potentialArrowAt === base.start
+  let optionalChained = false
+
+  while (true) {
+    let element = this.parseSubscript(base, startPos, startLoc, noCalls, maybeAsyncArrow, optionalChained, forInit)
+
+    if (element.optional) optionalChained = true
+    if (element === base || element.type === "ArrowFunctionExpression") {
+      if (optionalChained) {
+        const chainNode = this.startNodeAt(startPos, startLoc)
+        chainNode.expression = element
+        element = this.finishNode(chainNode, "ChainExpression")
+      }
+      return element
+    }
+
+    base = element
+  }
+}
+
+pp.parseSubscript = function(base, startPos, startLoc, noCalls, maybeAsyncArrow, optionalChained, forInit) {
+  let computed = this.eat(tt.bracketL)
+  if (computed || (optional && this.type !== tt.parenL && this.type !== tt.backQuote) || this.eat(tt.dot)) {
+    let node = this.startNodeAt(startPos, startLoc)
+    node.object = base
+    if (computed) {
+      node.property = this.parseExpression()
+      this.expect(tt.bracketR)
+    } else if (this.type === tt.privateId && base.type !== "Super") {
+      node.property = this.parsePrivateIdent()
+    } else {
+      node.property = this.parseIdent(this.options.allowReserved !== "never")
+    }
+    node.computed = !!computed
+    if (optionalSupported) {
+      node.optional = optional
+    }
+    base = this.finishNode(node, "MemberExpression")
+  } else if (!noCalls && this.eat(tt.parenL)) {
+    let refDestructuringErrors = new DestructuringErrors, oldYieldPos = this.yieldPos, oldAwaitPos = this.awaitPos, oldAwaitIdentPos = this.awaitIdentPos
+    this.yieldPos = 0
+    this.awaitPos = 0
+    this.awaitIdentPos = 0
+    let exprList = this.parseExprList(tt.parenR, this.options.ecmaVersion >= 8, false, refDestructuringErrors)
+    if (maybeAsyncArrow && !optional && this.shouldParseAsyncArrow()) {
+      this.checkPatternErrors(refDestructuringErrors, false)
+      this.checkYieldAwaitInDefaultParams()
+      if (this.awaitIdentPos > 0)
+        this.raise(this.awaitIdentPos, "Cannot use 'await' as identifier inside an async function")
+      this.yieldPos = oldYieldPos
+      this.awaitPos = oldAwaitPos
+      this.awaitIdentPos = oldAwaitIdentPos
+      return this.parseSubscriptAsyncArrow(startPos, startLoc, exprList, forInit)
+    }
+    this.checkExpressionErrors(refDestructuringErrors, true)
+    this.yieldPos = oldYieldPos || this.yieldPos
+    this.awaitPos = oldAwaitPos || this.awaitPos
+    this.awaitIdentPos = oldAwaitIdentPos || this.awaitIdentPos
+    let node = this.startNodeAt(startPos, startLoc)
+    node.callee = base
+    node.arguments = exprList
+    if (optionalSupported) {
+      node.optional = optional
+    }
+    base = this.finishNode(node, "CallExpression")
+  } else if (this.type === tt.backQuote) {
+    if (optional || optionalChained) {
+      this.raise(this.start, "Optional chaining cannot appear in the tag of tagged template expressions")
+    }
+    let node = this.startNodeAt(startPos, startLoc)
+    node.tag = base
+    node.quasi = this.parseTemplate({isTagged: true})
+    base = this.finishNode(node, "TaggedTemplateExpression")
+  }
+  return base
 }
 
 // Parse an atomic expression — either a single token that is an
@@ -285,3 +372,11 @@ pp.parseExprAtom = function(refDestructuringErrors, forInit, forNew) {
   }
 }
 
+pp.parseLiteral = function(value) {
+  let node = this.startNode()
+  node.value = value
+  node.raw = this.input.slice(this.start, this.end)
+  if (node.raw.charCodeAt(node.raw.length - 1) === 110) node.bigint = node.raw.slice(0, -1).replace(/_/g, "")
+  this.next()
+  return this.finishNode(node, "Literal")
+}

@@ -73,28 +73,35 @@ pp.parseForStatement = function(node) {
   // 1. [
   // 2. "VARNAME"
   if(this.type==tt.bracketL){
-    
+    this.parseFor(); 
   }else if(this.type==tt.string){
-
+    // parse {BEGIN}
+    this.next();
+    if(this.type !== tt.braceL) return this.unexpected();
+    let init = this.startNode(),kind = "let"; 
+    this.next();
+    this.parseVar(init, true, kind, false);
+    this.eat(tt.braceR);
+    this.finishNode(init, "VariableDeclaration")
   }else {
     return this.unexpected();
   }
 }
 
-pp.parseFor = function() {
-  // parse {BEGIN}
-  this.next();
-  if(this.type !== tt.braceL) return this.unexpected();
-  let init = this.startNode(),kind = isLet ? "let" : this.value
-  this.next();
-  this.parseVar(init, true, kind, false);
-  this.eat(tt.braceR);
-  this.finishNode(init, "VariableDeclaration")
+// sqf for中是否支持空下，test和update语句
+pp.parseFor = function(node,init) {
+  node.init = init;
   this.expect(tt.comma);
   // parse {CONDITION}
-  
-
-
+  // 先把花括号吃掉，还是开个新节点，花括号包进来
+  node.test = this.type === tt.semi ? null : this.parseExpression()
+  this.expect(tt.semi)
+  node.update = this.type === tt.parenR ? null : this.parseExpression()
+  this.expect(tt.parenR)
+  node.body = this.parseStatement("for")
+  this.exitScope()
+  this.labels.pop()
+  return this.finishNode(node, "ForStatement")
 }
 
 pp.parseFromTo = function() {
@@ -122,6 +129,7 @@ pp.parseVar = function(node, isFor, kind, allowMissingInitializer) {
 
 // sqf 
 pp.parseVarId = function(decl,kind){
+  // parseIdent 内含一个next()调用
   decl.id = this.parseIdent();
   this.checkLValSimple(decl.id,kind === "var" ? BIND_VAR : BIND_LEXICAL, false);
 }
